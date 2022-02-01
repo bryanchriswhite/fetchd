@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
-set -uexo pipefail
+set -ueEo pipefail
 
 FETCH_ADDR_REGEX="^fetch[0-9a-z]{39}"
 RECONCILIATION_CONTRACT="${1-""}"
 
 if [[ ! $RECONCILIATION_CONTRACT =~ $FETCH_ADDR_REGEX ]]; then
   echo -e "usage: query_all_registrations.sh CONTRACT
-
     Where CONTRACT is the address of the reconciliation contract to query."
   exit 1
 fi
