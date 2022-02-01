@@ -1,0 +1,81 @@
+diff --git i/src/contract.rs w/src/contract.rs
+index 8cbccf1..e437a70 100644
+--- i/src/contract.rs
++++ w/src/contract.rs
+@@ -38,8 +38,9 @@ pub fn execute(
+     match msg {
+         ExecuteMsg::Register {
+             eth_address,
++            native_address,
+             signature,
+-        } => try_register(deps, info, &eth_address, &signature),
++        } => try_register(deps, info, &eth_address, &native_address, &signature),
+         ExecuteMsg::Unregister {} => try_unregister(deps, &info.sender),
+         ExecuteMsg::SetPaused { paused } => try_set_paused(deps, info, paused),
+     }
+@@ -49,6 +50,7 @@ pub fn try_register(
+     deps: DepsMut,
+     info: MessageInfo,
+     eth_address: &str,
++    native_address: &str,
+     signature: &str,
+ ) -> Result<Response, ContractError> {
+     if pausing_is_paused(deps.storage)? {
+@@ -59,7 +61,8 @@ pub fn try_register(
+     let eth_address = check_registration(&info.sender, eth_address, signature)?;
+ 
+     // update the registration
+-    db_register_accounts(deps.storage, &info.sender, &eth_address)?;
++    let _native_address = Addr::unchecked(native_address);
++    db_register_accounts(deps.storage, &_native_address, &eth_address)?;
+ 
+     Ok(Response::default())
+ }
+diff --git i/src/crypto.rs w/src/crypto.rs
+index 16499a1..bb1a451 100644
+--- i/src/crypto.rs
++++ w/src/crypto.rs
+@@ -130,31 +130,7 @@ pub fn check_registration(
+     let address = parse_eth_address(eth_address)?;
+ 
+     // parse the eth style signature, extracting the recovery param from r and s
+-    let (recovery_param, raw_signature) = parse_signature(signature)?;
+-
+     // compute the expected message and then the digest for it
+-    let msg_hash = compute_digest(native_address, eth_address);
+-
+-    // recover the public key from the signature
+-    let recovered_public_key = secp256k1_recover_pubkey(&msg_hash, &raw_signature, recovery_param)
+-        .map_err(|_| UnrecoverableSignature)?;
+-
+-    if recovered_public_key.len() != 65 {
+-        return Err(ContractError::UnrecoverableSignature);
+-    }
+-    if recovered_public_key[0] != 4 {
+-        return Err(ContractError::UnrecoverableSignature);
+-    }
+-
+-    // recover the address from the public key
+-    let recovered_address: EthAddress = keccak(&recovered_public_key[1..])[12..]
+-        .try_into()
+-        .map_err(|_| UnrecoverableSignature)?;
+-
+-    // compare the addresses
+-    if recovered_address != address {
+-        return Err(UnverifiableRegistrationSignature);
+-    }
+ 
+     Ok(address)
+ }
+diff --git i/src/msg.rs w/src/msg.rs
+index cb8160d..714f160 100644
+--- i/src/msg.rs
++++ w/src/msg.rs
+@@ -12,6 +12,7 @@ pub struct InstantiateMsg {
+ pub enum ExecuteMsg {
+     Register {
+         eth_address: String,
++        native_address: String,
+ 
+         // base64 encoded string of the signature
+         signature: String,
